@@ -6,11 +6,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.run_nables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 import os
 
-# Khởi tạo ngay FastAPI để mở cổng mạng lập tức
+# 1. Khởi tạo FastAPI NGAY LẬP TỨC để Render thấy cổng mạng mở
 app = FastAPI()
 
 app.add_middleware(
@@ -24,16 +24,16 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
 
-# Biến toàn cục chứa bộ não AI
+# Biến toàn cục để lưu trữ bộ não AI sau khi nạp xong
 global_rag_chain = None
 
-# Hàm khởi tạo AI (Chỉ chạy ngầm 1 lần duy nhất khi có người nhắn tin)
+# 2. Hàm nạp dữ liệu (Chỉ chạy khi có người nhắn tin lần đầu)
 def initialize_ai():
     global global_rag_chain
     if global_rag_chain is not None:
-        return # Nếu đã nạp rồi thì bỏ qua
+        return
 
-    print("Bắt đầu nạp dữ liệu bầu cử và khởi tạo AI...")
+    print("--- Bắt đầu nạp dữ liệu AI ngầm ---")
     loader = TextLoader("baucu_data.txt", encoding="utf-8")
     docs = loader.load()
 
@@ -49,8 +49,8 @@ def initialize_ai():
     system_prompt = (
         "Bạn là trợ lý ảo tư vấn pháp luật về Bầu cử đại biểu Quốc hội và Hội đồng nhân dân tại Việt Nam. "
         "Sử dụng các thông tin được cung cấp dưới đây để trả lời câu hỏi. "
-        "Nếu thông tin không có trong tài liệu, hãy nói đúng nguyên văn câu này: 'Dạ, hiện tại tôi chưa có thông tin chính xác về vấn đề này. Mời bạn tìm kiếm thêm thông tin trực tiếp trên Cổng thông tin điện tử của Đảng bộ Phường tại địa chỉ: https://dangbo.phuongchanhhung.vn/' "
-        "Tuyệt đối không bịa đặt, không đưa ra quan điểm chính trị cá nhân. Trả lời ngắn gọn, súc tích và dễ hiểu.\n\n"
+        "Nếu thông tin không có trong tài liệu, hãy nói đúng nguyên văn: 'Dạ, hiện tại tôi chưa có thông tin chính xác về vấn đề này. Mời bạn tìm kiếm thêm thông tin trực tiếp trên Cổng thông tin điện tử của Đảng bộ Phường tại địa chỉ: https://dangbo.phuongchanhhung.vn/' "
+        "Trả lời ngắn gọn, súc tích.\n\n"
         "{context}"
     )
 
@@ -68,23 +68,19 @@ def initialize_ai():
         | llm
         | StrOutputParser()
     )
-    print("Khởi tạo AI thành công!")
+    print("--- AI đã sẵn sàng! ---")
 
-# API trang chủ để Render kiểm tra sức khỏe máy chủ
+# 3. Các cổng giao tiếp (Endpoints)
 @app.get("/")
 async def root():
-    return {"status": "Máy chủ Chatbot đang hoạt động tốt!"}
+    return {"message": "Chatbot Bau Cu is Online!"}
 
-# API xử lý tin nhắn
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     try:
-        # Gọi hàm nạp dữ liệu (Sẽ tốn khoảng 5-10 giây cho tin nhắn ĐẦU TIÊN)
-        initialize_ai()
-        
-        # Lấy câu trả lời
+        initialize_ai() # Nạp dữ liệu nếu chưa nạp
         response = global_rag_chain.invoke(req.message)
         return {"reply": response}
     except Exception as e:
-        print(f"Lỗi hệ thống: {e}")
+        print(f"Lỗi: {e}")
         raise HTTPException(status_code=500, detail=str(e))
