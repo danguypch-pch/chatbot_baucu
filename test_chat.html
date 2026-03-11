@@ -1,0 +1,106 @@
+<div id="chat-widget-button" style="position: fixed; bottom: 20px; right: 20px; background-color: #d32f2f; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 9999; font-size: 24px;">
+    💬
+</div>
+
+<div id="chat-widget-window" style="display: none; position: fixed; bottom: 90px; right: 20px; width: 350px; height: 450px; background-color: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 9999; flex-direction: column; overflow: hidden; font-family: Arial, sans-serif;">
+    
+    <div style="background-color: #d32f2f; color: white; padding: 15px; font-weight: bold; text-align: center;">
+        Trợ lý ảo Tư vấn Bầu cử
+        <span id="close-chat" style="float: right; cursor: pointer; font-weight: normal;">✖</span>
+    </div>
+
+    <div id="chat-messages" style="flex: 1; padding: 15px; overflow-y: auto; background-color: #f9f9f9; display: flex; flex-direction: column; gap: 10px;">
+        <div style="background-color: #e0e0e0; padding: 10px; border-radius: 10px; max-width: 80%; align-self: flex-start; font-size: 14px;">
+            Chào bạn, tôi là trợ lý ảo giải đáp thông tin về Bầu cử đại biểu Quốc hội và HĐND các cấp. Tôi có thể giúp gì cho bạn?
+        </div>
+    </div>
+
+    <div style="padding: 10px; border-top: 1px solid #ddd; display: flex; background: white;">
+        <input type="text" id="chat-input" placeholder="Nhập câu hỏi của bạn..." style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; outline: none;">
+        <button id="send-btn" style="background-color: #d32f2f; color: white; border: none; padding: 10px 15px; margin-left: 10px; border-radius: 5px; cursor: pointer;">Gửi</button>
+    </div>
+</div>
+
+<script>
+    const chatBtn = document.getElementById('chat-widget-button');
+    const chatWindow = document.getElementById('chat-widget-window');
+    const closeChat = document.getElementById('close-chat');
+    const sendBtn = document.getElementById('send-btn');
+    const chatInput = document.getElementById('chat-input');
+    const chatMessages = document.getElementById('chat-messages');
+
+    // Mở/Đóng cửa sổ chat
+    chatBtn.addEventListener('click', () => chatWindow.style.display = 'flex');
+    closeChat.addEventListener('click', () => chatWindow.style.display = 'none');
+
+    // Hàm gửi tin nhắn
+    async function sendMessage() {
+        const userText = chatInput.value.trim();
+        if (!userText) return;
+
+        // 1. Hiển thị tin nhắn của người dùng
+        appendMessage(userText, 'user');
+        chatInput.value = '';
+
+        // Hiển thị trạng thái đang gõ...
+        const typingId = appendMessage('Đang tìm kiếm thông tin...', 'bot', true);
+
+        try {
+            // 2. Gọi API Backend của bạn (NƠI XỬ LÝ RAG & GEMINI)
+            // LƯU Ý: Thay URL dưới đây bằng URL Backend thực tế của bạn
+const response = await fetch('http://localhost:8000/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userText })
+            });
+
+            const data = await response.json();
+            
+            // 3. Cập nhật câu trả lời từ bot
+            removeMessage(typingId);
+            appendMessage(data.reply, 'bot');
+
+        } catch (error) {
+            removeMessage(typingId);
+            appendMessage('Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau.', 'bot');
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+
+    // Hàm phụ trợ thêm tin nhắn vào UI
+    function appendMessage(text, sender, isTyping = false) {
+        const msgDiv = document.createElement('div');
+        const id = 'msg-' + Date.now();
+        msgDiv.id = id;
+        msgDiv.style.padding = '10px';
+        msgDiv.style.borderRadius = '10px';
+        msgDiv.style.maxWidth = '80%';
+        msgDiv.style.fontSize = '14px';
+        msgDiv.style.lineHeight = '1.4';
+        
+        if (sender === 'user') {
+            msgDiv.style.backgroundColor = '#d32f2f';
+            msgDiv.style.color = 'white';
+            msgDiv.style.alignSelf = 'flex-end';
+        } else {
+            msgDiv.style.backgroundColor = '#e0e0e0';
+            msgDiv.style.color = 'black';
+            msgDiv.style.alignSelf = 'flex-start';
+            if(isTyping) msgDiv.style.fontStyle = 'italic';
+        }
+        
+        msgDiv.textContent = text;
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return id;
+    }
+
+    function removeMessage(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    }
+</script>
