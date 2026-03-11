@@ -1,3 +1,14 @@
+import os
+import sys
+
+# MẸO CHO CHROMADB TRÊN RENDER: 
+# Render dùng Linux phiên bản cũ nên cần dòng này để không bị lỗi sqlite3
+try:
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    pass
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,11 +17,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.run_nables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-import os
 
-# 1. Khởi tạo FastAPI NGAY LẬP TỨC để Render thấy cổng mạng mở
 app = FastAPI()
 
 app.add_middleware(
@@ -24,16 +33,13 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
 
-# Biến toàn cục để lưu trữ bộ não AI sau khi nạp xong
 global_rag_chain = None
 
-# 2. Hàm nạp dữ liệu (Chỉ chạy khi có người nhắn tin lần đầu)
 def initialize_ai():
     global global_rag_chain
     if global_rag_chain is not None:
         return
 
-    print("--- Bắt đầu nạp dữ liệu AI ngầm ---")
     loader = TextLoader("baucu_data.txt", encoding="utf-8")
     docs = loader.load()
 
@@ -41,7 +47,8 @@ def initialize_ai():
     splits = text_splitter.split_documents(docs)
 
     embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-    vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings)
+    # Sử dụng thư mục tạm để lưu ChromaDB trên Render
+    vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings, persist_directory="./chroma_db")
     retriever = vectorstore.as_retriever()
 
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
@@ -68,9 +75,7 @@ def initialize_ai():
         | llm
         | StrOutputParser()
     )
-    print("--- AI đã sẵn sàng! ---")
 
-# 3. Các cổng giao tiếp (Endpoints)
 @app.get("/")
 async def root():
     return {"message": "Chatbot Bau Cu is Online!"}
@@ -78,7 +83,7 @@ async def root():
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     try:
-        initialize_ai() # Nạp dữ liệu nếu chưa nạp
+        initialize_ai()
         response = global_rag_chain.invoke(req.message)
         return {"reply": response}
     except Exception as e:
