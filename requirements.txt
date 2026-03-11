@@ -132,3 +132,13 @@ xxhash==3.6.0
 yarl==1.23.0
 zipp==3.23.0
 zstandard==0.25.0
+fastapi
+uvicorn
+pydantic
+langchain
+langchain-community
+langchain-google-genai
+langchain-chroma
+langchain-text-splitters
+pysqlite3-binary
+google-genai
